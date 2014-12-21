@@ -1,0 +1,58 @@
+BEGIN;
+BEGIN
+EXPLAIN (ANALYZE, BUFFERS)
+select
+	l_shipmode,
+	sum(case
+		when o_orderpriority = '1-URGENT'
+			or o_orderpriority = '2-HIGH'
+			then 1
+		else 0
+	end) as high_line_count,
+	sum(case
+		when o_orderpriority <> '1-URGENT'
+			and o_orderpriority <> '2-HIGH'
+			then 1
+		else 0
+	end) as low_line_count
+from
+	orders,
+	lineitem
+where
+	o_orderkey = l_orderkey
+	and l_shipmode in ('MAIL', 'TRUCK')
+	and l_commitdate < l_receiptdate
+	and l_shipdate < l_commitdate
+	and l_receiptdate >= date '1993-01-01'
+	and l_receiptdate < date '1993-01-01' + interval '1 year'
+group by
+	l_shipmode
+order by
+	l_shipmode;
+                                                                                           QUERY PLAN                                                                                           
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=992492.02..992492.03 rows=1 width=27) (actual time=24560.584..24560.585 rows=2 loops=1)
+   Sort Key: lineitem.l_shipmode
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=1196882 read=169603 written=235
+   ->  HashAggregate  (cost=992492.00..992492.01 rows=1 width=27) (actual time=24560.516..24560.517 rows=2 loops=1)
+         Group Key: lineitem.l_shipmode
+         Buffers: shared hit=1196877 read=169603 written=235
+         ->  Hash Join  (cost=598445.93..987404.51 rows=290714 width=27) (actual time=10668.782..24209.058 rows=312754 loops=1)
+               Hash Cond: (lineitem.l_orderkey = orders.o_orderkey)
+               Buffers: shared hit=1196877 read=169603 written=235
+               ->  Index Scan using lineitem_l_orderkey_idx_part2 on lineitem  (cost=0.43..379874.20 rows=290714 width=15) (actual time=0.119..13064.966 rows=312754 loops=1)
+                     Filter: ((l_shipmode = ANY ('{MAIL,TRUCK}'::bpchar[])) AND (l_receiptdate >= '1993-01-01'::date) AND (l_receiptdate < '1994-01-01 00:00:00'::timestamp without time zone))
+                     Rows Removed by Filter: 6883916
+                     Buffers: shared hit=948607 read=161310 written=216
+               ->  Hash  (cost=408509.11..408509.11 rows=15194911 width=20) (actual time=10526.908..10526.908 rows=15015000 loops=1)
+                     Buckets: 16777216  Batches: 1  Memory Usage: 893553kB
+                     Buffers: shared hit=248267 read=8293 written=19
+                     ->  Seq Scan on orders  (cost=0.00..408509.11 rows=15194911 width=20) (actual time=0.024..4941.366 rows=15015000 loops=1)
+                           Buffers: shared hit=248267 read=8293 written=19
+ Planning time: 2.932 ms
+ Execution time: 24578.511 ms
+(21 rows)
+
+COMMIT;
+COMMIT

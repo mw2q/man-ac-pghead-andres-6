@@ -1,0 +1,82 @@
+BEGIN;
+BEGIN
+EXPLAIN (ANALYZE, BUFFERS)
+select
+	sum(l_extendedprice* (1 - l_discount)) as revenue
+from
+	lineitem,
+	part
+where
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#34'
+		and p_container in ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+		and l_quantity >= 4 and l_quantity <= 4+10
+		and p_size between 1 and 5
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	)
+	or
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#32'
+		and p_container in ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+		and l_quantity >= 11 and l_quantity <= 11+10
+		and p_size between 1 and 10
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	)
+	or
+	(
+		p_partkey = l_partkey
+		and p_brand = 'Brand#21'
+		and p_container in ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+		and l_quantity >= 22 and l_quantity <= 22+10
+		and p_size between 1 and 15
+		and l_shipmode in ('AIR', 'AIR REG')
+		and l_shipinstruct = 'DELIVER IN PERSON'
+	);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       QUERY PLAN                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=161457.38..161457.39 rows=1 width=8) (actual time=772.383..772.383 rows=1 loops=1)
+   Buffers: shared hit=46774 read=24704 dirtied=92 written=66
+   ->  Nested Loop  (cost=13412.33..161448.76 rows=1149 width=8) (actual time=158.878..771.714 rows=1107 loops=1)
+         Buffers: shared hit=46774 read=24704 dirtied=92 written=66
+         ->  Bitmap Heap Scan on part  (cost=13411.77..37566.73 rows=4803 width=30) (actual time=158.321..326.030 rows=4805 loops=1)
+               Recheck Cond: (((p_container = ANY ('{"SM CASE","SM BOX","SM PACK","SM PKG"}'::bpchar[])) AND (p_brand = 'Brand#34'::bpchar) AND (p_size <= 5) AND (p_size >= 1)) OR ((p_container = ANY ('{"MED BAG","MED BOX","MED PKG","MED PACK"}'::bpchar[])) AND (p_brand = 'Brand#32'::bpchar) AND (p_size <= 10) AND (p_size >= 1)) OR ((p_container = ANY ('{"LG CASE","LG BOX","LG PACK","LG PKG"}'::bpchar[])) AND (p_brand = 'Brand#21'::bpchar)))
+               Filter: ((p_size >= 1) AND (((p_brand = 'Brand#34'::bpchar) AND (p_container = ANY ('{"SM CASE","SM BOX","SM PACK","SM PKG"}'::bpchar[])) AND (p_size <= 5)) OR ((p_brand = 'Brand#32'::bpchar) AND (p_container = ANY ('{"MED BAG","MED BOX","MED PKG","MED PACK"}'::bpchar[])) AND (p_size <= 10)) OR ((p_brand = 'Brand#21'::bpchar) AND (p_container = ANY ('{"LG CASE","LG BOX","LG PACK","LG PKG"}'::bpchar[])) AND (p_size <= 15))))
+               Rows Removed by Filter: 5597
+               Heap Blocks: exact=9243
+               Buffers: shared hit=1668 read=9399 written=29
+               ->  BitmapOr  (cost=13411.77..13411.77 rows=10421 width=0) (actual time=156.453..156.453 rows=0 loops=1)
+                     Buffers: shared hit=559 read=1265 written=5
+                     ->  BitmapAnd  (cost=4481.80..4481.80 rows=803 width=0) (actual time=59.783..59.783 rows=0 loops=1)
+                           Buffers: shared hit=3 read=606
+                           ->  Bitmap Index Scan on part_p_container_p_brand_p_partkey_idx  (cost=0.00..290.19 rows=8048 width=0) (actual time=4.147..4.147 rows=8037 loops=1)
+                                 Index Cond: ((p_container = ANY ('{"SM CASE","SM BOX","SM PACK","SM PKG"}'::bpchar[])) AND (p_brand = 'Brand#34'::bpchar))
+                                 Buffers: shared hit=3 read=58
+                           ->  Bitmap Index Scan on part_p_size_idx  (cost=0.00..4188.96 rows=199653 width=0) (actual time=53.186..53.186 rows=199678 loops=1)
+                                 Index Cond: ((p_size <= 5) AND (p_size >= 1))
+                                 Buffers: shared read=548
+                     ->  BitmapAnd  (cost=8638.72..8638.72 rows=1610 width=0) (actual time=92.625..92.625 rows=0 loops=1)
+                           Buffers: shared hit=552 read=604 written=5
+                           ->  Bitmap Index Scan on part_p_container_p_brand_p_partkey_idx  (cost=0.00..290.71 rows=8098 width=0) (actual time=3.766..3.766 rows=8160 loops=1)
+                                 Index Cond: ((p_container = ANY ('{"MED BAG","MED BOX","MED PKG","MED PACK"}'::bpchar[])) AND (p_brand = 'Brand#32'::bpchar))
+                                 Buffers: shared hit=4 read=58
+                           ->  Bitmap Index Scan on part_p_size_idx  (cost=0.00..8345.36 rows=397693 width=0) (actual time=86.441..86.441 rows=399409 loops=1)
+                                 Index Cond: ((p_size <= 10) AND (p_size >= 1))
+                                 Buffers: shared hit=548 read=546 written=5
+                     ->  Bitmap Index Scan on part_p_container_p_brand_p_partkey_idx  (cost=0.00..289.79 rows=8007 width=0) (actual time=3.736..3.736 rows=7962 loops=1)
+                           Index Cond: ((p_container = ANY ('{"LG CASE","LG BOX","LG PACK","LG PKG"}'::bpchar[])) AND (p_brand = 'Brand#21'::bpchar))
+                           Buffers: shared hit=4 read=55
+         ->  Index Scan using lineitem_l_partkey_l_quantity_l_shipmode_idx on lineitem  (cost=0.56..25.78 rows=1 width=16) (actual time=0.082..0.090 rows=0 loops=4805)
+               Index Cond: ((l_partkey = part.p_partkey) AND (l_shipmode = ANY ('{AIR,"AIR REG"}'::bpchar[])))
+               Filter: ((l_shipinstruct = 'DELIVER IN PERSON'::bpchar) AND (((l_quantity >= 4::double precision) AND (l_quantity <= 14::double precision)) OR ((l_quantity >= 11::double precision) AND (l_quantity <= 21::double precision)) OR ((l_quantity >= 22::double precision) AND (l_quantity <= 32::double precision))) AND (((part.p_brand = 'Brand#34'::bpchar) AND (part.p_container = ANY ('{"SM CASE","SM BOX","SM PACK","SM PKG"}'::bpchar[])) AND (l_quantity >= 4::double precision) AND (l_quantity <= 14::double precision) AND (part.p_size <= 5)) OR ((part.p_brand = 'Brand#32'::bpchar) AND (part.p_container = ANY ('{"MED BAG","MED BOX","MED PKG","MED PACK"}'::bpchar[])) AND (l_quantity >= 11::double precision) AND (l_quantity <= 21::double precision) AND (part.p_size <= 10)) OR ((part.p_brand = 'Brand#21'::bpchar) AND (part.p_container = ANY ('{"LG CASE","LG BOX","LG PACK","LG PKG"}'::bpchar[])) AND (l_quantity >= 22::double precision) AND (l_quantity <= 32::double precision) AND (part.p_size <= 15))))
+               Rows Removed by Filter: 4
+               Buffers: shared hit=45106 read=15305 dirtied=92 written=37
+ Planning time: 4.278 ms
+ Execution time: 772.789 ms
+(38 rows)
+
+COMMIT;
+COMMIT

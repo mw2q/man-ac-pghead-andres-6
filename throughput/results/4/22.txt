@@ -1,0 +1,80 @@
+BEGIN;
+BEGIN
+EXPLAIN (ANALYZE, BUFFERS)
+select
+	cntrycode,
+	count(*) as numcust,
+	sum(c_acctbal) as totacctbal
+from
+	(
+		select
+			substr(c_phone, 1, 2) as cntrycode,
+			c_acctbal
+		from
+			customer
+		where
+			substr(c_phone, 1, 2) in
+				('33', '16', '32', '10', '19', '12', '18')
+			and c_acctbal > (
+				select
+					avg(c_acctbal)
+				from
+					customer
+				where
+					c_acctbal > 0.00
+					and substr(c_phone, 1, 2) in
+						('33', '16', '32', '10', '19', '12', '18')
+			)
+			and not exists (
+				select
+					*
+				from
+					orders
+				where
+					o_custkey = c_custkey
+			)
+	) as vip
+group by
+	cntrycode
+order by
+	cntrycode;
+                                                                             QUERY PLAN                                                                             
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort  (cost=698288.66..698288.67 rows=3 width=20) (actual time=10363.084..10363.085 rows=7 loops=1)
+   Sort Key: (substr((customer.c_phone)::text, 1, 2))
+   Sort Method: quicksort  Memory: 25kB
+   Buffers: shared hit=323866 read=4722 dirtied=243 written=139
+   InitPlan 1 (returns $0)
+     ->  Aggregate  (cost=52971.84..52971.85 rows=1 width=4) (actual time=488.778..488.779 rows=1 loops=1)
+           Buffers: shared hit=35283 read=1061 written=96
+           ->  Bitmap Heap Scan on customer customer_1  (cost=6679.94..52014.11 rows=383092 width=4) (actual time=98.563..413.369 rows=382695 loops=1)
+                 Recheck Cond: ((substr((c_phone)::text, 1, 2) = ANY ('{33,16,32,10,19,12,18}'::text[])) AND (c_acctbal > 0::double precision))
+                 Heap Blocks: exact=35277
+                 Buffers: shared hit=35283 read=1061 written=96
+                 ->  Bitmap Index Scan on customer_c_phone_idx_c_acctbal  (cost=0.00..6584.17 rows=383092 width=0) (actual time=89.308..89.308 rows=382695 loops=1)
+                       Index Cond: (substr((c_phone)::text, 1, 2) = ANY ('{33,16,32,10,19,12,18}'::text[]))
+                       Buffers: shared hit=9 read=1058 written=96
+   ->  HashAggregate  (cost=645316.74..645316.78 rows=3 width=20) (actual time=10363.025..10363.026 rows=7 loops=1)
+         Group Key: substr((customer.c_phone)::text, 1, 2)
+         Buffers: shared hit=323863 read=4722 dirtied=243 written=139
+         ->  Hash Anti Join  (cost=601298.07..644875.00 rows=58899 width=20) (actual time=9984.703..10341.579 rows=63672 loops=1)
+               Hash Cond: (customer.c_custkey = orders.o_custkey)
+               Buffers: shared hit=323863 read=4722 dirtied=243 written=139
+               ->  Bitmap Heap Scan on customer  (cost=2943.53..41910.65 rows=140538 width=24) (actual time=565.539..789.564 rows=190994 loops=1)
+                     Recheck Cond: ((substr((c_phone)::text, 1, 2) = ANY ('{33,16,32,10,19,12,18}'::text[])) AND (c_acctbal > $0))
+                     Heap Blocks: exact=35170
+                     Buffers: shared hit=68147 read=3914 written=139
+                     ->  Bitmap Index Scan on customer_c_phone_idx  (cost=0.00..2908.39 rows=140538 width=0) (actual time=554.991..554.991 rows=190994 loops=1)
+                           Index Cond: ((substr((c_phone)::text, 1, 2) = ANY ('{33,16,32,10,19,12,18}'::text[])) AND (c_acctbal > $0))
+                           Buffers: shared hit=35293 read=1598 written=139
+               ->  Hash  (cost=408447.02..408447.02 rows=15192602 width=4) (actual time=9190.569..9190.569 rows=15000000 loops=1)
+                     Buckets: 16777216  Batches: 1  Memory Usage: 658416kB
+                     Buffers: shared hit=255713 read=808 dirtied=243
+                     ->  Seq Scan on orders  (cost=0.00..408447.02 rows=15192602 width=4) (actual time=0.020..4295.459 rows=15000000 loops=1)
+                           Buffers: shared hit=255713 read=808 dirtied=243
+ Planning time: 2.661 ms
+ Execution time: 10380.012 ms
+(34 rows)
+
+COMMIT;
+COMMIT
